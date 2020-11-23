@@ -5,7 +5,8 @@ import json
 import os.path
 import argparse
 import i3ipc
-from fa_icons import icons
+from fa_icons import icons as free_icons
+from fa_icons_all import icons as all_icons
 
 I3_CONFIG_PATHS = (os.path.expanduser("~/.i3"), os.path.expanduser("~/.config/i3"))
 
@@ -22,7 +23,7 @@ DEFAULT_APP_ICON_CONFIG = {
 }
 
 
-def build_rename(i3, app_icons, delim, uniq):
+def build_rename(i3, app_icons, delim, uniq, icons):
     """Build rename callback function to pass to i3ipc.
 
     Parameters
@@ -70,7 +71,9 @@ def build_rename(i3, app_icons, delim, uniq):
                 seen = set()
                 names = [x for x in names if x not in seen and not seen.add(x)]
             names = delim.join(names)
-            if int(workspace.num) > 0:
+            if not names:
+                newname = str(workspace.num)
+            elif int(workspace.num) > 0:
                 newname = "{}: {}".format(workspace.num, names)
             else:
                 newname = names
@@ -155,18 +158,26 @@ def main():
                         action="store_true",
                         required=False,
                         default=False)
+    parser.add_argument("--pro", help="Allow using pro icons", action="store_true")
     args = parser.parse_args()
 
     app_icons = _get_app_icons(args.config_path)
 
+    if args.pro:
+        icons = all_icons
+    else:
+        icons = free_icons
+
     # check for missing icons
     for app, icon_name in app_icons.items():
-        if not icon_name in icons:
+        if icon_name not in all_icons:
             print("Specified icon '{}' for app '{}' does not exist!".format(icon_name, app))
+        elif icon_name not in icons:
+            print("Specified icon '{}' for app '{}' is a pro icon, but pro icons are not enabled (use --pro to fix)".format(icon_name, app))
     # build i3-connection
     i3 = i3ipc.Connection()
 
-    rename = build_rename(i3, app_icons, args.delimiter, args.uniq)
+    rename = build_rename(i3, app_icons, args.delimiter, args.uniq, icons)
     for case in ['window::move', 'window::new', 'window::title', 'window::close']:
         i3.on(case, rename)
     i3.main()
